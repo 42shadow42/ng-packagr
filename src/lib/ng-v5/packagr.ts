@@ -1,5 +1,10 @@
-import { InjectionToken, Provider, ReflectiveInjector, ValueProvider } from 'injection-js';
+import { InjectionToken, Provider, ReflectiveInjector } from 'injection-js';
+import { of as observableOf } from 'rxjs/observable/of';
+import { take, map } from 'rxjs/operators';
 import { buildNgPackage } from '../steps/build-ng-package';
+import { BuildGraph } from '../brocc/build-graph';
+import { Node } from '../brocc/node';
+import { provideProject, PACKAGE_TRANSFORM_TOKEN, PACKAGE_TRANSFORM_PROVIDER } from './package.transform';
 
 export class NgPackagr {
 
@@ -16,22 +21,30 @@ export class NgPackagr {
     return this;
   }
 
+  public forProject(project: string): NgPackagr {
+    this.providers.push(provideProject(project));
+
+    return this;
+  }
+
   public build(): Promise<void> {
     const injector = ReflectiveInjector.resolveAndCreate(this.providers);
-    const project = injector.get(PROJECT_TOKEN);
 
-    return buildNgPackage({ project });
+    // TODO
+    const transforms = injector.get(PACKAGE_TRANSFORM_TOKEN);
+
+    return observableOf(new BuildGraph())
+      .pipe(
+        transforms,
+        take(1),
+        map(() => {})
+      ).toPromise();
   }
 
 }
 
 export const ngPackagr = (): NgPackagr => new NgPackagr([
+  PACKAGE_TRANSFORM_PROVIDER,
+
   // TODO: default providers come here
 ]);
-
-export const PROJECT_TOKEN = new InjectionToken<string>('ng.v5.project');
-
-export const provideProject = (project: string): ValueProvider => ({
-  provide: PROJECT_TOKEN,
-  useValue: project
-});
